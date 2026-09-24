@@ -1,6 +1,8 @@
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs/promises";
+import { createInterface } from "node:readline/promises";
+import { stdin as input, stdout as output } from "node:process";
 import { randomBytes, scryptSync } from "node:crypto";
 export interface Config {
   host: string;
@@ -39,12 +41,12 @@ const generatePin = () => String(randomBytes(4).readUInt32BE(0) % 1_000_000).pad
 export async function loadConfig(args = process.argv.slice(2)): Promise<Config> {
   if (args.includes("--help")) {
     console.log(
-      `Studio Files — local file manager\n\nnpm start -- [--host 127.0.0.1] [--port 3210] [--config /path/config.json]\nnpm start -- --lan [--password <pin>]\n\nDefault: all accessible volumes, no login, loopback only.\n--lan binds to this machine's LAN address and requires a PIN, freshly generated and printed\neach time the server starts (or set explicitly with --password). The PIN lives only in memory\nfor this run — it is never written to disk, and stops working as soon as the server stops.\nHARBOR_DATA_DIR selects configuration/trash storage (default ~/.harbor).\nConfig: { "host": "127.0.0.1", "port": 3210, "allVolumes": true, "roots": [], "maxUploadBytes": 10737418240 }\nOS permissions still apply. No automatic elevation.`,
+      `Filemager — local file manager\n\nnpm start\nnpm start -- --local\nnpm start -- --lan [--password <pin>]\nnpm start -- --host 127.0.0.1 --port 3210\n\nDefault: npm start asks whether to use Local or LAN mode.\nLocal mode binds to this machine only. LAN mode binds to the machine's network address,\nrequires a PIN, and prints a QR code for quick access.\nHARBOR_DATA_DIR selects configuration/trash storage (default ~/.harbor).\nConfig: { "host": "127.0.0.1", "port": 3210, "allVolumes": true, "roots": [], "maxUploadBytes": 10737418240 }\nOS permissions still apply. No automatic elevation.`,
     );
     process.exit(0);
   }
   const allowed = new Set(["--host", "--port", "--config", "--password"]);
-  const boolFlags = new Set(["--lan"]);
+  const boolFlags = new Set(["--lan", "--local", "--interactive"]);
   for (let i = 0; i < args.length; i++) {
     if (boolFlags.has(args[i])) continue;
     if (!allowed.has(args[i])) throw new Error(`Unknown option: ${args[i]}`);
@@ -55,7 +57,26 @@ export async function loadConfig(args = process.argv.slice(2)): Promise<Config> 
     const i = args.indexOf(name);
     return i < 0 ? undefined : args[i + 1];
   };
-  const lan = args.includes("--lan");
+  if (args.includes("--lan") && args.includes("--local")) throw new Error("Choose either --lan or --local.");
+  let lan = args.includes("--lan");
+  if (!lan && !args.includes("--local") && args.includes("--interactive")) {
+    const readline = createInterface({ input, output });
+    try {
+      while (true) {
+        const answer = (await readline.question("\nChoose access mode: [1] Local  [2] LAN\nSelect 1 or 2: "))
+          .trim()
+          .toLowerCase();
+        if (answer === "1" || answer === "local" || answer === "l") break;
+        if (answer === "2" || answer === "lan" || answer === "n") {
+          lan = true;
+          break;
+        }
+        console.log("Please enter 1 for Local or 2 for LAN.");
+      }
+    } finally {
+      readline.close();
+    }
+  }
   const dataDir = path.resolve(dataDirectory());
   await fs.mkdir(dataDir, { recursive: true, mode: 0o700 });
   const configPath = arg("--config") || path.join(dataDir, "config.json");

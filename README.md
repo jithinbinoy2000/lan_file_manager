@@ -1,6 +1,6 @@
-# Studio Files
+# Filemager
 
-A working local file manager with the Studio Admin file-manager layout, a Node.js/TypeScript API, and a React/Vite/Tailwind frontend using **shadcn/ui Base UI** components. Production runs as one Node process.
+A working local file manager with a Node.js/TypeScript API and a React/Vite/Tailwind frontend using **shadcn/ui Base UI** components. Production runs as one Node process. Maintained by **Jithin Binoy**.
 
 The interface follows the reference's sidebar, compact header, Roboto typography, monochrome controls, rounded folder cards, file cards, and grid/list layout. File counts, dates, thumbnails, and storage are real data. Navigation is tailored to filesystem locations, rather than linking to unrelated dashboard demos. An additional breadcrumb/navigation row provides actual folder navigation.
 
@@ -14,7 +14,7 @@ npm run build
 npm start
 ```
 
-Open the URL printed at startup (default **http://127.0.0.1:3210**). The current workspace has been configured to use **http://127.0.0.1:3211** so the existing browser address opens the real filesystem. `npm start` builds automatically if the production output is missing. After code changes, run `npm run build` again.
+`npm start` builds automatically if the production output is missing, then asks you to choose **Local** or **LAN** mode. LAN mode prints the real network URL, a temporary PIN, and a QR code that phones can scan. After code changes, run `npm run build` again.
 
 ```sh
 npm run dev          # API :3210 and Vite :5173, both loopback
@@ -22,6 +22,8 @@ npm run typecheck
 npm test
 npm run build
 npm start -- --help
+npm start -- --local
+npm start -- --lan
 npm start -- --port 3220
 npm start -- --config /absolute/path/to/config.json
 npm run format
@@ -31,7 +33,7 @@ For development, open **http://127.0.0.1:5173**. Stop an existing production ser
 
 ## Access model and remote machines
 
-The requested initial mode has **no account/password screen**. It is consequently **loopback-only**; `--host 0.0.0.0` and other network bindings are rejected. A random HttpOnly, SameSite session and CSRF token protect API requests, but these are browser-request protections, not user authentication. Other processes/users who can access the host loopback interface are trusted in this version.
+Local mode has no account/password screen and stays on loopback. LAN mode binds to the machine's active IPv4 address and requires a temporary PIN shown in the terminal. A random HttpOnly, SameSite session and CSRF token protect API requests.
 
 Full accessible volume access is on, as requested. The visible **Settings → All volumes** switch can restrict it. No privilege elevation occurs. Encrypted, disconnected, sandboxed, permission-denied, or OS-protected locations remain inaccessible. On macOS, OS privacy permissions granted to your terminal apply to the server. Run under an ordinary user account.
 
@@ -49,7 +51,7 @@ ssh -N -L 3210:127.0.0.1:3210 your-user@your-server
 
 Then open http://127.0.0.1:3210 on your client. The app manages the **server's** volumes. If client port 3210 is occupied, use `-L 3220:127.0.0.1:3210` and open :3220. The authentication and encrypted transport are provided by SSH; no SSH service, keys, account, or server was provisioned by this project. This deployment path is documented, not tested against a remote host in this environment.
 
-**Direct LAN access and public internet hosting remain disabled pending the requested authentication/HTTPS decisions.** Do not publish the localhost service through an unauthenticated reverse proxy. Android browser layouts are supported; Android server hosting through Termux remains an open requirement and is not claimed as supported or tested. Android's storage restrictions still apply.
+Direct public-internet hosting is not supported. Do not publish the service through an unauthenticated reverse proxy. Android browser layouts are supported; Android server hosting through Termux remains an open requirement and is not claimed as supported or tested. Android's storage restrictions still apply.
 
 ## Configuration
 

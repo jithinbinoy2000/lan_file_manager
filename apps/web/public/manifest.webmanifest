@@ -1,0 +1,12 @@
+{
+  "name": "Filemager",
+  "short_name": "Filemager",
+  "description": "A fast local file manager for your devices.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafb",
+  "theme_color": "#f8fafb",
+  "icons": [
+    { "src": "/filemager-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

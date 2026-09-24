@@ -9,7 +9,6 @@ import {
   type CSSProperties,
 } from "react";
 import {
-  Command,
   PlusCircle,
   FolderOpen,
   Home,
@@ -47,6 +46,7 @@ import {
   Info,
   Maximize,
   Minimize,
+  UserRound,
 } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import type {
@@ -616,21 +616,27 @@ function Workspace() {
     />
   );
   return loginRequired ? (
-    <div className="empty-state" style={{ minHeight: "100vh" }}>
-      <ShieldCheck />
-      <h2>PIN required</h2>
-      <p>
-        This Studio Files instance is shared over the network. Enter the PIN shown in the server terminal.
-      </p>
+    <main className="pin-gate">
+      <section className="pin-card" aria-labelledby="pin-title">
+        <div className="pin-brand" aria-hidden="true">
+          <FolderOpen />
+        </div>
+        <p className="pin-eyebrow">Filemager</p>
+        <h1 id="pin-title">Welcome back</h1>
+        <p className="pin-description">
+          Enter the PIN shown in the server terminal to open this shared workspace.
+        </p>
       <form
+        className="pin-form"
         onSubmit={(e) => {
           e.preventDefault();
           const password = new FormData(e.currentTarget).get("password");
           if (typeof password === "string" && password) void submitLogin(password);
         }}
-        style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}
       >
+        <label htmlFor="access-pin">Access PIN</label>
         <Input
+          id="access-pin"
           name="password"
           type="text"
           inputMode="numeric"
@@ -643,15 +649,16 @@ function Workspace() {
           {loginBusy ? <LoaderCircle className="animate-spin" /> : "Unlock"}
         </Button>
       </form>
-      {loginError ? <p style={{ color: "var(--destructive)" }}>{loginError}</p> : null}
-    </div>
+      {loginError ? <p className="pin-error" role="alert">{loginError}</p> : null}
+      </section>
+    </main>
   ) : (
     <>
       <Sidebar className="studio-sidebar">
         <SidebarHeader className="p-0">
           <button className="brand" onClick={() => home && navigate({ root: home.id, path: "" })}>
-            <Command size={18} />
-            <span>Studio Files</span>
+            <FolderOpen size={18} />
+            <span>Filemager</span>
           </button>
           <div className="quick-create">
             <Button
@@ -792,11 +799,11 @@ function Workspace() {
           </div>
           <button className="owner" onClick={() => setDialog("settings")}>
             <div className="avatar">
-              <Command size={18} />
+              <UserRound size={18} />
             </div>
             <span>
-              <strong>Local workspace</strong>
-              <small>This device · No login</small>
+              <strong>Jithin Binoy</strong>
+              <small>Filemager workspace</small>
             </span>
             <MoreHorizontal size={17} />
           </button>
@@ -834,7 +841,7 @@ function Workspace() {
               <CircleHelp />
             </Button>
             <span className="avatar small">
-              <Command size={16} />
+              <UserRound size={16} />
             </span>
           </div>
         </header>
@@ -1201,10 +1208,6 @@ function Workspace() {
                       </Button>
                     </>
                   )}
-                  <span className="local-badge">
-                    <ShieldCheck size={13} />
-                    Local connection
-                  </span>
                 </div>
               </footer>
             </>
@@ -1401,16 +1404,6 @@ function Workspace() {
                   onChange={(e) => setHidden(e.target.checked)}
                 />
               </label>
-              <div className="setting-note">
-                <ShieldCheck size={18} />
-                <div>
-                  <strong>Localhost · No login</strong>
-                  <p>
-                    Network binding is disabled until remote authentication is agreed. This browser controls
-                    its own download location. OS permissions always apply.
-                  </p>
-                </div>
-              </div>
             </div>
           )}
           {dialog === "trash" && (

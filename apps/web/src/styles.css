@@ -152,6 +152,88 @@ input[type="checkbox"] {
   flex: 1;
   min-width: 0;
 }
+.pin-gate {
+  min-height: 100dvh;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  background:
+    radial-gradient(circle at 50% 0%, rgb(31 111 104 / 10%), transparent 38%),
+    var(--background);
+}
+.pin-card {
+  width: min(100%, 420px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  box-shadow: 0 20px 60px rgb(23 23 23 / 9%);
+  text-align: center;
+}
+.pin-brand {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 20px;
+  border-radius: 16px;
+  color: #1f6f68;
+  background: #f4c95d;
+}
+.pin-brand svg {
+  width: 28px;
+  height: 28px;
+}
+.pin-eyebrow {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.pin-card h1 {
+  margin-top: 8px;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.pin-description {
+  max-width: 310px;
+  margin-top: 10px;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+.pin-form {
+  width: 100%;
+  display: grid;
+  gap: 9px;
+  margin-top: 28px;
+  text-align: left;
+}
+.pin-form label {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.pin-form input {
+  width: 100%;
+  height: 40px;
+  text-align: center;
+  letter-spacing: 0.16em;
+}
+.pin-form button {
+  width: 100%;
+  height: 40px;
+  margin-top: 5px;
+}
+.pin-error {
+  margin-top: 14px;
+  color: var(--destructive);
+  font-size: 12px;
+}
 .brand {
   height: 48px;
   display: flex;
