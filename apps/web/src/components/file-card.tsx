@@ -130,6 +130,9 @@ export function FileCard({
   const folder = entry.kind === "directory";
   const { icon: Icon, label } = fileType(entry);
   const isVideo = entry.mime.startsWith("video/");
+  const opensPreview =
+    entry.kind === "file" &&
+    (entry.mime.startsWith("image/") || entry.mime.startsWith("video/") || entry.mime.startsWith("audio/"));
   const doAction = (action: Action) => onAction(action, entry);
   return (
     <ContextMenu
@@ -145,7 +148,7 @@ export function FileCard({
         className={`file-card ${view === "list" ? "list-card" : folder ? "folder-card" : ""} ${selected ? "selected" : ""}`}
         onClick={(event) => {
           if ((event.target as HTMLElement).closest("button, [role=menuitem]")) return;
-          if (isMobile) doAction("open");
+          if (isMobile || opensPreview) doAction("open");
           else onSelect(event);
         }}
         onDoubleClick={(event) => {
@@ -236,14 +239,13 @@ export function FileCard({
               >
                 <Star className={starred ? "fill-current" : ""} />
               </Button>
-              <div className="file-art-label">
-                <span>{label}</span>
-                <span>{bytes(entry.size)}</span>
-              </div>
             </div>
             <div className="file-description">
               <h3 title={entry.name}>{entry.name}</h3>
-              <p>Modified {date(entry.modified)}</p>
+              <div className="file-meta">
+                <p>Modified {date(entry.modified)}</p>
+                <p>{bytes(entry.size)}</p>
+              </div>
             </div>
           </>
         )}

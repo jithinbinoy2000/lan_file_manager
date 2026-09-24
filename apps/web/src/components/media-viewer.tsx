@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
 import { useDrag } from "@use-gesture/react";
 import { TransformWrapper, TransformComponent, type ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
+import { VideoPlayer } from "@streamspark/react-video-player";
+import screenfull from "screenfull";
 import {
   X,
   ChevronLeft,
@@ -18,6 +20,10 @@ import {
   File,
   Music,
   AlertCircle,
+  Ratio,
+  Sun,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import type { Entry, Location } from "../../../../packages/shared/types";
 import { Button } from "./ui/button";
@@ -28,6 +34,8 @@ const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const isMedia = (e: Entry) =>
   e.kind === "file" &&
   (e.mime.startsWith("image/") || e.mime.startsWith("video/") || e.mime.startsWith("audio/"));
+const needsTranscode = (e: Entry) =>
+  e.mime.startsWith("video/") && /\.(mov|mkv|avi|wmv|flv|mpg|mpeg|mts|m2ts|3gp)$/i.test(e.name);
 function formatTime(s: number) {
   if (!Number.isFinite(s)) return "0:00";
   const m = Math.floor(s / 60),
@@ -320,6 +328,121 @@ function MediaPlayer({
     </div>
   );
 }
+function StreamVideoPlayer({
+  src,
+  onFail,
+  autoplay,
+  controlsVisible,
+  onPlayingChange,
+}: {
+  src: string;
+  onFail: () => void;
+  autoplay: boolean;
+  controlsVisible: boolean;
+  onPlayingChange: (playing: boolean) => void;
+}) {
+  const playerRef = useRef<HTMLDivElement>(null);
+  const [brightness, setBrightness] = useState(1),
+    [fitMode, setFitMode] = useState<"contain" | "cover" | "fill">("contain");
+  const toggleFullscreen = () => {
+    if (!screenfull.isEnabled || !playerRef.current) return;
+    if (screenfull.element === playerRef.current) void screenfull.exit();
+    else void screenfull.request(playerRef.current);
+  };
+  return (
+    <div
+      ref={playerRef}
+      className="stream-video-player"
+      style={{ "--preview-brightness": brightness, "--preview-fit": fitMode } as CSSProperties}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+        toggleFullscreen();
+      }}
+    >
+      <VideoPlayer
+        src={src}
+        title="Video preview"
+        theme="dark"
+        autoplay={autoplay}
+        controls={controlsVisible}
+        width="100%"
+        height="100%"
+        enablePictureInPicture={false}
+        enableTheaterMode={false}
+        enableSocialShare={false}
+        controlOptions={{
+          showPlayButton: true,
+          showVolumeControl: true,
+          showTimeDisplay: true,
+          showSeekBar: true,
+          showPlaybackSpeed: true,
+          showFullscreenButton: true,
+          showPictureInPictureButton: false,
+          showTheaterModeButton: false,
+          showSocialShare: false,
+          controlsBarStyle: {
+            backgroundColor: "rgba(0, 0, 0, 0.72)",
+            padding: "12px",
+            gap: "8px",
+          },
+          playButtonStyle: {
+            backgroundColor: "rgba(255, 255, 255, 0.12)",
+            hoverBackgroundColor: "rgba(255, 255, 255, 0.22)",
+            color: "#fff",
+          },
+          controlButtonStyle: {
+            backgroundColor: "transparent",
+            hoverBackgroundColor: "rgba(255, 255, 255, 0.16)",
+            color: "#fff",
+          },
+          rightControlsButtonStyle: {
+            backgroundColor: "transparent",
+            hoverBackgroundColor: "rgba(255, 255, 255, 0.16)",
+            color: "#fff",
+          },
+          seekBarStyle: {
+            playedColor: "#fff",
+            bufferedColor: "rgba(255, 255, 255, 0.35)",
+            thumbColor: "#fff",
+          },
+        }}
+        onError={() => onFail()}
+        onPlay={() => onPlayingChange(true)}
+        onPause={() => onPlayingChange(false)}
+      />
+      <div className="stream-video-tools" onPointerDown={(event) => event.stopPropagation()}>
+        <label className="stream-video-brightness">
+          <Sun size={15} />
+          <input
+            type="range"
+            min="0.6"
+            max="1.4"
+            step="0.05"
+            value={brightness}
+            aria-label="Video brightness"
+            onChange={(event) => setBrightness(Number(event.target.value))}
+          />
+        </label>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={<Button variant="ghost" size="sm" className="stream-video-fit" aria-label="Video fit mode" />}
+          >
+            <Ratio />
+            <span>Fit</span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {(["contain", "cover", "fill"] as const).map((mode) => (
+              <DropdownMenuItem key={mode} onClick={() => setFitMode(mode)}>
+                {fitMode === mode ? "✓ " : ""}
+                {mode === "contain" ? "Fit" : mode === "cover" ? "Fill" : "Stretch"}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
 export function MediaViewer({
   entry,
   loc,
@@ -333,11 +456,25 @@ export function MediaViewer({
   onClose: () => void;
   onChange: (e: Entry) => void;
 }) {
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState(false),
+    [chromeVisible, setChromeVisible] = useState(true),
+    [videoPlaying, setVideoPlaying] = useState(false);
+  const chromeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const media = entries.filter(isMedia);
   const index = media.findIndex((e) => e.path === entry.path);
   const orientation = useObjectFit();
   useEffect(() => setFailed(false), [entry.path]);
+  const wakeChrome = useCallback(() => {
+    setChromeVisible(true);
+    if (chromeTimer.current) clearTimeout(chromeTimer.current);
+    chromeTimer.current = setTimeout(() => setChromeVisible(false), 2000);
+  }, []);
+  useEffect(() => {
+    wakeChrome();
+    return () => {
+      if (chromeTimer.current) clearTimeout(chromeTimer.current);
+    };
+  }, [wakeChrome]);
   const go = useCallback(
     (d: 1 | -1) => {
       if (media.length < 2) return;
@@ -371,10 +508,46 @@ export function MediaViewer({
       }
     }
   }, [index, media, loc.root]);
-  const fileUrl = url({ root: loc.root, path: entry.path });
+  const fileUrl = `${url({ root: loc.root, path: entry.path })}${needsTranscode(entry) ? "&transcode=true" : ""}`;
   const isImage = entry.mime.startsWith("image/") && !entry.mime.includes("svg");
   const isVideo = entry.mime.startsWith("video/");
   const isAudio = entry.mime.startsWith("audio/");
+  const orientationSupported = typeof screen.orientation?.lock === "function";
+  const [orientationLocked, setOrientationLocked] = useState(false);
+  const requestVideoFullscreen = () => {
+    if (!screenfull.isEnabled || screenfull.isFullscreen) return;
+    const target = document.querySelector<HTMLElement>(".stream-video-player") || document.documentElement;
+    void screenfull.request(target).catch(() => {});
+  };
+  useEffect(() => {
+    if (orientation !== "landscape" || !isVideo || !videoPlaying || screenfull.isFullscreen) return;
+    requestVideoFullscreen();
+  }, [orientation, isVideo, videoPlaying]);
+  const rotateToLandscape = async () => {
+    requestVideoFullscreen();
+    if (orientationSupported) {
+      try {
+        await screen.orientation.lock("landscape");
+        setOrientationLocked(true);
+      } catch {
+        /* Orientation lock is browser and device dependent. */
+      }
+    }
+  };
+  const toggleOrientationLock = async () => {
+    if (!orientationSupported) return;
+    if (orientationLocked) {
+      screen.orientation.unlock();
+      setOrientationLocked(false);
+      return;
+    }
+    try {
+      await screen.orientation.lock(orientation);
+      setOrientationLocked(true);
+    } catch {
+      /* Orientation lock is browser and device dependent. */
+    }
+  };
   const swipeBind = useDrag(
     ({ last, movement: [mx], direction: [dx], distance: [dist] }) => {
       if (isImage) return;
@@ -384,9 +557,11 @@ export function MediaViewer({
   );
   return (
     <div
-      className="media-viewer"
+      className={`media-viewer ${chromeVisible ? "" : "chrome-hidden"}`}
       data-orientation={orientation}
       style={{ "--vh": `${window.innerHeight}px` } as CSSProperties}
+      onPointerMove={wakeChrome}
+      onPointerDown={wakeChrome}
       {...(isImage ? {} : swipeBind())}
     >
       <div className="media-viewer-header">
@@ -399,6 +574,21 @@ export function MediaViewer({
           </span>
         </div>
         <div className="media-viewer-header-actions">
+          {orientation === "portrait" && (
+            <Button variant="ghost" size="icon" aria-label="Rotate to landscape" onClick={rotateToLandscape}>
+              <RotateCw />
+            </Button>
+          )}
+          {orientationSupported && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={orientationLocked ? "Unlock orientation" : "Lock orientation"}
+              onClick={() => void toggleOrientationLock()}
+            >
+              {orientationLocked ? <Unlock /> : <Lock />}
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="More options" />}>
               <MoreVertical />
@@ -446,7 +636,13 @@ export function MediaViewer({
         ) : isImage ? (
           <ImageStage src={fileUrl} alt={entry.name} onFail={() => setFailed(true)} onSwipe={go} />
         ) : isVideo ? (
-          <MediaPlayer kind="video" src={fileUrl} onFail={() => setFailed(true)} autoplay />
+          <StreamVideoPlayer
+            src={fileUrl}
+            onFail={() => setFailed(true)}
+            autoplay
+            controlsVisible={chromeVisible}
+            onPlayingChange={setVideoPlaying}
+          />
         ) : isAudio ? (
           <MediaPlayer kind="audio" src={fileUrl} onFail={() => setFailed(true)} autoplay />
         ) : (

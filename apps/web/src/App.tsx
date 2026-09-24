@@ -122,6 +122,11 @@ const savedStars = (): string[] => {
     return [];
   }
 };
+const savedBoolean = (key: string, fallback: boolean) => {
+  const value = localStorage.getItem(key);
+  return value === null ? fallback : value === "true";
+};
+const savedString = (key: string, fallback: string) => localStorage.getItem(key) || fallback;
 function Workspace() {
   const [shortcuts, setShortcuts] = useState<Shortcut[]>([]),
     [ready, setReady] = useState(false),
@@ -135,9 +140,9 @@ function Workspace() {
     [loginBusy, setLoginBusy] = useState(false);
   const [search, setSearch] = useState(""),
     [debounced, setDebounced] = useState(""),
-    [hidden, setHidden] = useState(false),
-    [sort, setSort] = useState("name"),
-    [direction, setDirection] = useState("asc"),
+    [hidden, setHidden] = useState(() => savedBoolean("studio-hidden", false)),
+    [sort, setSort] = useState(() => savedString("studio-sort", "name")),
+    [direction, setDirection] = useState(() => savedString("studio-direction", "asc")),
     [offset, setOffset] = useState(0),
     [refresh, setRefresh] = useState(0);
   const [view, setView] = useState<"grid" | "list">(() =>
@@ -145,7 +150,7 @@ function Workspace() {
     ),
     [selected, setSelected] = useState<string[]>([]),
     [stars, setStars] = useState(savedStars),
-    [starFilter, setStarFilter] = useState(false);
+    [starFilter, setStarFilter] = useState(() => savedBoolean("studio-star-filter", false));
   const [clipboard, setClipboard] = useState<{ items: Location[]; mode: "copy" | "move" } | null>(null),
     [preview, setPreview] = useState<Entry | null>(null),
     [dialog, setDialog] = useState<
@@ -292,6 +297,18 @@ function Workspace() {
   useEffect(() => {
     localStorage.setItem("studio-view", view);
   }, [view]);
+  useEffect(() => {
+    localStorage.setItem("studio-hidden", String(hidden));
+  }, [hidden]);
+  useEffect(() => {
+    localStorage.setItem("studio-sort", sort);
+  }, [sort]);
+  useEffect(() => {
+    localStorage.setItem("studio-direction", direction);
+  }, [direction]);
+  useEffect(() => {
+    localStorage.setItem("studio-star-filter", String(starFilter));
+  }, [starFilter]);
   useEffect(() => {
     if (!ready) return;
     let stopped = false,
@@ -834,35 +851,6 @@ function Workspace() {
               <h1>{starFilter ? "Starred files" : loc.path ? parts.at(-1) : "My files"}</h1>
               <p>Organize, browse, and find your local files.</p>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                disabled={!ready}
-                onClick={() => {
-                  setName("");
-                  setDialog("new");
-                }}
-              >
-                <FolderPlus />
-                New folder
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger render={<Button />} disabled={!ready}>
-                  <Upload />
-                  Upload
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => fileInput.current?.click()}>
-                    <Upload />
-                    Upload files
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => folderInput.current?.click()}>
-                    <FolderPlus />
-                    Upload folder
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
           </div>
           <div className="file-toolbar">
             <div className="search-field">
@@ -880,37 +868,94 @@ function Workspace() {
                 </button>
               )}
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
-                <SlidersHorizontal />
-                Filter & sort
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                {[
-                  ["name", "Name"],
-                  ["modified", "Last modified"],
-                  ["size", "File size"],
-                ].map(([value, label]) => (
-                  <DropdownMenuItem key={value} onClick={() => setSort(value)}>
-                    {sort === value ? <Check /> : <span className="w-4" />}
-                    {label}
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuCheckboxItem
-                  checked={direction === "desc"}
-                  onCheckedChange={(v) => setDirection(v ? "desc" : "asc")}
+            <div className="file-toolbar-actions">
+              <div className="view-switch">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={view === "grid" ? "active" : ""}
+                  aria-pressed={view === "grid"}
+                  onClick={() => setView("grid")}
                 >
-                  Descending order
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem checked={hidden} onCheckedChange={setHidden}>
-                  Show hidden files
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem checked={starFilter} onCheckedChange={setStarFilter}>
-                  Starred in this folder
-                </DropdownMenuCheckboxItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <Grid2X2 />
+                  Grid View
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={view === "list" ? "active" : ""}
+                  aria-pressed={view === "list"}
+                  onClick={() => setView("list")}
+                >
+                  <List />
+                  List View
+                </Button>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+                  <SlidersHorizontal />
+                  Filter & sort
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  {[
+                    ["name", "Name"],
+                    ["modified", "Last modified"],
+                    ["size", "File size"],
+                  ].map(([value, label]) => (
+                    <DropdownMenuItem key={value} onClick={() => setSort(value)}>
+                      {sort === value ? <Check /> : <span className="w-4" />}
+                      {label}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={direction === "desc"}
+                    onCheckedChange={(v) => setDirection(v ? "desc" : "asc")}
+                  >
+                    Descending order
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem checked={hidden} onCheckedChange={setHidden}>
+                    Show hidden files
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem checked={starFilter} onCheckedChange={setStarFilter}>
+                    Starred in this folder
+                  </DropdownMenuCheckboxItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={<Button variant="outline" size="sm" aria-label="File actions" />}
+                  disabled={!ready}
+                >
+                  <MoreHorizontal />
+                  <span className="actions-label">Actions</span>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setName("");
+                      setDialog("new");
+                    }}
+                  >
+                    <FolderPlus />
+                    New folder
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => fileInput.current?.click()}>
+                    <Upload />
+                    Upload files
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => folderInput.current?.click()}>
+                    <FolderPlus />
+                    Upload folder
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={reload}>
+                    <RefreshCw className={loading ? "animate-spin" : ""} />
+                    Refresh
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
           <div className="navigation-bar" title={`${currentVolume?.path || ""}/${loc.path}`}>
             <div className="nav-arrows">
@@ -946,7 +991,7 @@ function Workspace() {
                     </BreadcrumbLink>
                   )}
                 </BreadcrumbItem>
-                {parts.length > 3 && (
+                {parts.length > 2 && (
                   <>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
@@ -969,7 +1014,7 @@ function Workspace() {
                   </>
                 )}
                 {parts.map((p, i) =>
-                  parts.length > 3 && i < parts.length - 2 ? null : (
+                  parts.length > 2 && i < parts.length - 2 ? null : (
                     <Fragment key={i}>
                       <BreadcrumbSeparator />
                       <BreadcrumbItem>
@@ -989,15 +1034,6 @@ function Workspace() {
                 )}
               </BreadcrumbList>
             </Breadcrumb>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="ml-auto"
-              aria-label="Refresh folder"
-              onClick={reload}
-            >
-              <RefreshCw className={loading ? "animate-spin" : ""} />
-            </Button>
           </div>
           {selected.length > 0 && (
             <div className="selection-bar">
@@ -1098,28 +1134,6 @@ function Workspace() {
               <section>
                 <div className="section-heading">
                   <h2>{starFilter ? "Starred files" : "All files"}</h2>
-                  <div className="view-switch">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={view === "grid" ? "active" : ""}
-                      aria-pressed={view === "grid"}
-                      onClick={() => setView("grid")}
-                    >
-                      <Grid2X2 />
-                      Grid View
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={view === "list" ? "active" : ""}
-                      aria-pressed={view === "list"}
-                      onClick={() => setView("list")}
-                    >
-                      <List />
-                      List View
-                    </Button>
-                  </div>
                 </div>
                 {files.length ? (
                   <div className={view === "grid" ? "file-grid" : "file-list"}>

@@ -1,6 +1,7 @@
 import express, { type Request, type Response, type NextFunction } from "express";
 import fs from "node:fs/promises";
 import { createReadStream, createWriteStream } from "node:fs";
+import { spawn } from "node:child_process";
 import path from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
 import { pipeline } from "node:stream/promises";
@@ -8,6 +9,7 @@ import Busboy from "busboy";
 import { ZipArchive } from "archiver";
 import mime from "mime-types";
 import sharp from "sharp";
+import ffmpegPath from "ffmpeg-static";
 import { verifyPassword, type Config } from "./config.js";
 import { discoverVolumes } from "./volumes.js";
 import { discoverShortcuts } from "./shortcuts.js";
@@ -323,6 +325,55 @@ export async function createApp(config: Config, { webDir = path.resolve("dist/we
         const type = mime.lookup(file) || "application/octet-stream";
         const safe = /^(image\/(png|jpeg|gif|webp|avif|bmp)|audio\/|video\/)/.test(type);
         const download = req.query.download === "true" || !safe;
+        if (req.query.transcode === "true" && type.startsWith("video/") && !download) {
+          const executable =
+            typeof ffmpegPath === "string"
+              ? ffmpegPath
+              : (ffmpegPath as unknown as { default?: string | null }).default;
+          if (!executable) throw new HttpError(503, "Bundled FFmpeg is unavailable.");
+          res.status(200).set({
+            "Content-Type": "video/mp4",
+            "Cache-Control": "private, no-store",
+            "Accept-Ranges": "none",
+            "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(path.basename(file)).replace(/'/g, "%27")}`,
+          });
+          const encoder = spawn(executable, [
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            file,
+            "-map",
+            "0:v:0?",
+            "-map",
+            "0:a:0?",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "23",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            "-movflags",
+            "frag_keyframe+empty_moov+default_base_moof",
+            "-f",
+            "mp4",
+            "pipe:1",
+          ], { stdio: ["ignore", "pipe", "pipe"] });
+          const stop = () => {
+            if (!encoder.killed) encoder.kill();
+          };
+          res.on("close", stop);
+          encoder.stdout.pipe(res);
+          await new Promise<void>((resolve, reject) => {
+            encoder.once("error", reject);
+            encoder.once("close", (code) => (code === 0 ? resolve() : reject(new Error("FFmpeg could not decode this video."))));
+          }).finally(() => res.off("close", stop));
+          return;
+        }
         res.setHeader("Content-Type", safe ? type : "application/octet-stream");
         res.setHeader(
           "Content-Disposition",
